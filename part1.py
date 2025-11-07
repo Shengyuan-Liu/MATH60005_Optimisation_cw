@@ -18,45 +18,61 @@ def fit(n, x_train, y_train, x_valid, y_valid):
     """
     A = np.vander(x_train, N=n, increasing=True)
     theta = np.linalg.inv(A.T @ A) @ A.T @ y_train
+    train_mse = np.mean((A @ theta - y_train)**2)
     V_theta = np.vander(x_valid, N=n, increasing=True) @ theta
-    mse = np.mean((V_theta - y_valid)**2)
-    return theta, mse
+    valid_mse = np.mean((V_theta - y_valid)**2)
+    return theta, valid_mse, train_mse
 
 ns = np.arange(1, 21)
 mses = []
 thetas = {}
+n_optim = None
 for n in ns:
-    th, mse = fit(n, x_train, y_train, x_valid, y_valid)
-    mses.append(mse)
-    thetas[n] = th
+    theta, valid_mse, train_mse = fit(n, x_train, y_train, x_valid, y_valid)
+    if valid_mse < 1e-3:
+        n_optim = n
+    mses.append(valid_mse)
+    thetas[n] = theta
 
-# 找到最小满足 MSE <= 1e-3 的 n*
-n_star = next((int(n) for n, e in zip(ns, mses) if e <= 1e-3), None)
-print("n* =", n_star, "MSE =", mses[ns.tolist().index(n_star)] if n_star else None)
+print(f"n* = {n_optim}, MSE = {mses[n_optim - 1] if n_optim else None}")
 
-# 画 MSE–n
-plt.figure(); plt.plot(ns, mses, marker='o'); plt.xlabel('degree n'); plt.ylabel('MSE (validation)'); plt.show()
+# MSE–n
+plt.figure()
+plt.yscale('log')
+plt.plot(ns, mses, marker='o')
+plt.axhline(y=1e-3, linestyle='--', color='red')
+plt.xlabel('degree n')
+plt.ylabel('MSE (validation)')
+plt.show()
 
-# 在 n* 下做“训练点数–MSE”与函数曲线
-if n_star is not None:
-    m_all = len(xs_tr)
-    sizes = np.linspace(max(10, n_star+2), m_all, num=10, dtype=int)
-    mses_vs_m = []
+if n_optim is not None:
+    m_all = len(x_train)
+    sizes = range(20, m_all)
+    valid_mses = []
+    train_mses = []
     rng = np.random.default_rng(42)
     for mprime in sizes:
         idx = rng.choice(m_all, size=mprime, replace=False)
-        th, mse = fit_and_mse(n_star, xs_tr[idx], y_tr[idx], xs_va, y_va)
-        mses_vs_m.append(mse)
-    plt.figure(); plt.plot(sizes, mses_vs_m, marker='o'); plt.xlabel('# training points'); plt.ylabel('MSE (validation)'); plt.show()
-
-    # 画学到的函数
-    th = thetas[n_star]
-    grid = np.linspace(xs_tr.min(), xs_tr.max(), 400)
-    yhat = vander(grid, n_star) @ th
-    # 反缩放仅用于横坐标显示（如果你想用原始 x 轴，可以反变换）
-    def inv_scale(z): return (z+1)*(xmax-xmin)/2 + xmin
+        theta, valid_mse, train_mse = fit(n_optim, x_train[idx], y_train[idx], x_valid, y_valid)
+        valid_mses.append(valid_mse)
+        train_mses.append(train_mse)
     plt.figure()
-    plt.scatter(inv_scale(xs_tr), y_tr, s=10, label='train')
-    plt.scatter(inv_scale(xs_va), y_va, s=10, label='val')
-    plt.plot(inv_scale(grid), yhat, label=f'fit (n={n_star})')
-    plt.legend(); plt.xlabel('x'); plt.ylabel('V(x)'); plt.show()
+    plt.yscale('log')
+    plt.plot(sizes, valid_mses, marker='o')
+    plt.plot(sizes, train_mses)
+    plt.xlabel('# training points')
+    plt.ylabel('MSE (validation)')
+    plt.show()
+
+    theta = thetas[n_optim]
+    grid = np.linspace(x_train.min(), x_train.max(), 400)
+    yhat = np.vander(grid, n_optim, increasing=True) @ theta
+
+    plt.figure()
+    plt.scatter(x_train, y_train, label='train')
+    plt.scatter(x_valid, y_valid, s=10, label='val')
+    plt.plot(grid, yhat, label=f'fit (n={n_optim})')
+    plt.legend()
+    plt.xlabel('x')
+    plt.ylabel('V(x)')
+    plt.show()
