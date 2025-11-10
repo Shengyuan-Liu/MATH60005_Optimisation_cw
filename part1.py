@@ -58,9 +58,9 @@ if n_optim is not None:
         train_mses.append(train_mse)
     plt.figure()
     plt.yscale('log')
-    plt.plot(sizes, valid_mses, marker='o')
-    plt.plot(sizes, train_mses)
-    plt.xlabel('# training points')
+    plt.plot(sizes, valid_mses, marker='o', label='valid mse')
+    plt.plot(sizes, train_mses, label='train mse')
+    plt.xlabel('training points')
     plt.ylabel('MSE (validation)')
     plt.show()
 
